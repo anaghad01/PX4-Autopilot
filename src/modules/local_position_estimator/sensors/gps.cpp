@@ -1,6 +1,9 @@
 #include "../BlockLocalPositionEstimator.hpp"
 #include <systemlib/mavlink_log.h>
 #include <matrix/math.hpp>
+#include <math.h> 
+using namespace std;
+#define INF 10000 
 
 extern orb_advert_t mavlink_log_pub;
 
@@ -8,6 +11,7 @@ extern orb_advert_t mavlink_log_pub;
 // to initialize
 static const uint32_t		REQ_GPS_INIT_COUNT = 10;
 static const uint32_t		GPS_TIMEOUT = 1000000;	// 1.0 s
+
 
 void BlockLocalPositionEstimator::gpsInit()
 {
@@ -243,3 +247,5 @@ void BlockLocalPositionEstimator::gpsCheckTimeout()
 		}
 	}
 }
+
+

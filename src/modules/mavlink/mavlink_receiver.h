@@ -103,6 +103,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_trajectory_bezier.h>
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
+#include <uORB/topics/set_value.h>
 
 class Mavlink;
 
@@ -120,7 +121,7 @@ public:
 	static void *start_helper(void *context);
 
 private:
-
+	void handle_message_set_value(mavlink_message_t *msg);
 	void acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result);
 
 	/**
@@ -328,4 +329,5 @@ private:
 	// Disallow copy construction and move assignment.
 	MavlinkReceiver(const MavlinkReceiver &) = delete;
 	MavlinkReceiver operator=(const MavlinkReceiver &) = delete;
+        orb_advert_t _set_value_pub{nullptr};
 };

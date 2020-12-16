@@ -1,3 +1,4 @@
+
 /****************************************************************************
  *
  *   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
@@ -32,10 +33,81 @@
  ****************************************************************************/
 
 #include "EKF2.hpp"
-
+#define INF 10000000000000
 using namespace time_literals;
+using namespace std;
 
 using math::constrain;
+
+/************************Check if point inside polygon*****************/
+struct Point 
+{ 
+    long int x; 
+    long int y; 
+}; 
+
+bool onSegment(Point p, Point q, Point r) 
+{ 
+    if (q.x <= max(p.x, r.x) && q.x >= min(p.x, r.x) && 
+            q.y <= max(p.y, r.y) && q.y >= min(p.y, r.y)) 
+        return true; 
+    return false; 
+} 
+
+long int orientation(Point p, Point q, Point r) 
+{ 
+    long int val = (q.y - p.y) * (r.x - q.x) - 
+            (q.x - p.x) * (r.y - q.y); 
+ 
+    if (val == 0) return 0; // colinear 
+    return (val > 0)? 1: 2; // clock or counterclock wise 
+} 
+ 
+bool doIntersect(Point p1, Point q1, Point p2, Point q2) 
+{ 
+    long int o1 = orientation(p1, q1, p2); 
+    long int o2 = orientation(p1, q1, q2); 
+    long int o3 = orientation(p2, q2, p1); 
+    long int o4 = orientation(p2, q2, q1); 
+ 
+    // General case 
+    if (o1 != o2 && o3 != o4) 
+        return true; 
+ 
+    // Special Cases 
+    if (o1 == 0 && onSegment(p1, p2, q1)) return true; 
+    if (o2 == 0 && onSegment(p1, q2, q1)) return true;  
+    if (o3 == 0 && onSegment(p2, p1, q2)) return true; 
+    if (o4 == 0 && onSegment(p2, q1, q2)) return true; 
+ 
+    return false; // Doesn't fall in any of the above cases 
+} 
+
+bool isInside(Point polygon[], long int n, Point p) 
+{ 
+    if (n < 3) return false; 
+ 
+    // Create a point for line segment from p to infinite 
+    Point extreme = {INF, p.y}; 
+
+    long int count = 0, i = 0; 
+    do
+    { 
+        long int next = (i+1)%n; 
+        if (doIntersect(polygon[i], polygon[next], p, extreme)) 
+        { 
+            if (orientation(polygon[i], p, polygon[next]) == 0) 
+            return onSegment(polygon[i], p, polygon[next]); 
+ 
+            count++; 
+        } 
+        i = next; 
+    } while (i != 0); 
+ 
+    // Return true if count is odd, false otherwise 
+    return count&1; 
+} 
+/**********************************************************************/
 
 EKF2::EKF2(bool replay_mode):
 	ModuleParams(nullptr),
@@ -179,7 +251,6 @@ EKF2::~EKF2()
 bool EKF2::init()
 {
 	const uint32_t device_id = _param_ekf2_imu_id.get();
-
 	// if EKF2_IMU_ID is non-zero we use the corresponding IMU, otherwise the voted primary (sensor_combined)
 	if (device_id != 0) {
 		for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
@@ -1148,7 +1219,21 @@ void EKF2::Run()
 }
 
 void EKF2::fillGpsMsgWithVehicleGpsPosData(gps_message &msg, const vehicle_gps_position_s &data)
-{
+{	
+        Point polygon1[] = {{473979470, 473979470}, {85455682, 473979470}, {85455682, 85455682}, {473979470, 85455682}}; 
+        long int n = sizeof(polygon1)/sizeof(polygon1[0]); 
+        Point p = {data.lat, data.lon}; 
+        if(isInside(polygon1, n, p))
+	{
+		PX4_INFO("YES");
+	} 
+        else
+	{
+		PX4_INFO("NO");
+	}//lat:473979216    lon:85455682
+
+        int a = data.lon;
+        PX4_INFO("a: %d",a);
 	msg.time_usec = data.timestamp;
 	msg.lat = data.lat;
 	msg.lon = data.lon;
@@ -1402,12 +1487,9 @@ int EKF2::print_usage(const char *reason)
 		R"DESCR_STR(
 ### Description
 Attitude and position estimator using an Extended Kalman Filter. It is used for Multirotors and Fixed-Wing.
-
 The documentation can be found on the [ECL/EKF Overview & Tuning](https://docs.px4.io/master/en/advanced_config/tuning_the_ecl_ekf.html) page.
-
 ekf2 can be started in replay mode (`-r`): in this mode it does not access the system time, but only uses the
 timestamps from the sensor topics.
-
 )DESCR_STR");
 
 	PRINT_MODULE_USAGE_NAME("ekf2", "estimator");

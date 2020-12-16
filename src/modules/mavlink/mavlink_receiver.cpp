@@ -110,6 +110,11 @@ void
 MavlinkReceiver::handle_message(mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
+
+	case MAVLINK_MSG_ID_SET_VALUE:
+		handle_message_set_value(msg);
+         	break;
+
 	case MAVLINK_MSG_ID_COMMAND_LONG:
 		handle_message_command_long(msg);
 		break;
@@ -3041,4 +3046,26 @@ MavlinkReceiver::receive_start(pthread_t *thread, Mavlink *parent)
 	pthread_create(thread, &receiveloop_attr, MavlinkReceiver::start_helper, (void *)parent);
 
 	pthread_attr_destroy(&receiveloop_attr);
+}
+
+
+void
+MavlinkReceiver::handle_message_set_value(mavlink_message_t *msg)
+{
+    mavlink_set_value_t man;
+    mavlink_msg_set_value_decode(msg, &man);
+
+    struct set_value_s key;
+    memset(&key, 0, sizeof(key));
+
+    key.timestamp = hrt_absolute_time();
+    key.setpoint = man.setpoint;
+
+    if (_set_value_pub == nullptr) {
+        _set_value_pub = orb_advertise(ORB_ID(set_value), &key);
+
+    } else {
+        orb_publish(ORB_ID(set_value), _set_value_pub, &key);
+    }
+
 }
